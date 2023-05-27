@@ -1,26 +1,32 @@
-import { useState } from "react";
 import server from "./server";
-
-import * as secp from "ethereum-cryptography/secp256k1";
+import { useState } from "react";
+import { keccak256 } from "ethereum-cryptography/keccak.js";
+import { utf8ToBytes, toHex } from "ethereum-cryptography/utils.js";
+import { getSignature } from "../generateSign";
 
 function Transfer({ address, setBalance }) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
+  const [showSign, setShowSign] = useState(false);
 
   const setValue = (setter) => (evt) => setter(evt.target.value);
 
-  const signature = {
-    r: 90379873105571560482372034230671786435429659285294836365453328497691226132253n.toString(
-      10
-    ),
-    s: 33734444668588895967073496462358469071789400249170660730176799430910281558296n.toString(
-      10
-    ),
-    recovery: 0,
-  };
+  function transferHandler() {
+    if (!recipient || !sendAmount || !address) {
+      alert("Please enter valid addresses");
+      return;
+    }
+    setShowSign(true);
+  }
 
   async function transfer(evt) {
     evt.preventDefault();
+
+    setShowSign(true);
+    const message = "First signed transaction";
+    const messageHash = toHex(keccak256(utf8ToBytes(message)));
+
+    const signature = getSignature(messageHash);
 
     try {
       const {
@@ -30,37 +36,46 @@ function Transfer({ address, setBalance }) {
         amount: parseInt(sendAmount),
         recipient,
         signature,
+        message: messageHash,
       });
       setBalance(balance);
     } catch (ex) {
       alert(ex.response.data.message);
     }
+    setShowSign(false);
   }
 
   return (
-    <form className="container transfer" onSubmit={transfer}>
-      <h1>Send Transaction</h1>
+    <>
+      <form className="container transfer" onSubmit={transfer}>
+        <h1>Send Transaction</h1>
 
-      <label>
-        Send Amount
-        <input
-          placeholder="1, 2, 3..."
-          value={sendAmount}
-          onChange={setValue(setSendAmount)}
-        ></input>
-      </label>
+        <label>
+          Send Amount
+          <input
+            placeholder="1, 2, 3..."
+            value={sendAmount}
+            onChange={setValue(setSendAmount)}
+          ></input>
+        </label>
 
-      <label>
-        Recipient
-        <input
-          placeholder="Type an address, for example: 0x2"
-          value={recipient}
-          onChange={setValue(setRecipient)}
-        ></input>
-      </label>
+        <label>
+          Recipient
+          <input
+            placeholder="Type an address, for example: 0x2"
+            value={recipient}
+            onChange={setValue(setRecipient)}
+          ></input>
+        </label>
 
-      <input type="submit" className="button" value="Transfer" />
-    </form>
+        {!showSign && (
+          <button type="button" className="button" onClick={transferHandler}>
+            Transfer
+          </button>
+        )}
+        {showSign && <input type="submit" className="button" value={"Sign"} />}
+      </form>
+    </>
   );
 }
 
