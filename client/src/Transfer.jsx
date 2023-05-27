@@ -1,11 +1,23 @@
 import { useState } from "react";
 import server from "./server";
 
+import * as secp from "ethereum-cryptography/secp256k1";
+
 function Transfer({ address, setBalance }) {
   const [sendAmount, setSendAmount] = useState("");
   const [recipient, setRecipient] = useState("");
 
   const setValue = (setter) => (evt) => setter(evt.target.value);
+
+  const signature = {
+    r: 90379873105571560482372034230671786435429659285294836365453328497691226132253n.toString(
+      10
+    ),
+    s: 33734444668588895967073496462358469071789400249170660730176799430910281558296n.toString(
+      10
+    ),
+    recovery: 0,
+  };
 
   async function transfer(evt) {
     evt.preventDefault();
@@ -17,6 +29,7 @@ function Transfer({ address, setBalance }) {
         sender: address,
         amount: parseInt(sendAmount),
         recipient,
+        signature,
       });
       setBalance(balance);
     } catch (ex) {
