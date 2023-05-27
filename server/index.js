@@ -4,8 +4,6 @@ const cors = require("cors");
 const port = 3042;
 
 const { secp256k1 } = require("ethereum-cryptography/secp256k1");
-const { sha256 } = require("ethereum-cryptography/sha256");
-const { utf8ToBytes } = require("ethereum-cryptography/utils");
 
 app.use(cors());
 app.use(express.json());
@@ -16,9 +14,6 @@ const balances = {
   "032f3d1c66078e3dc6482c5e06e98b94e38395a0f573c9ce8c71bdb8f2042d2cd9": 75,
 };
 
-const message = "First signed transaction";
-const messageHash = sha256(utf8ToBytes(message));
-
 app.get("/balance/:address", (req, res) => {
   const { address } = req.params;
   const balance = balances[address] || 0;
@@ -26,26 +21,30 @@ app.get("/balance/:address", (req, res) => {
 });
 
 app.post("/send", (req, res) => {
-  const { sender, recipient, amount, signature } = req.body;
+  const { sender, recipient, amount, signature, messageHash } = req.body;
 
-  const modifiedSignature = {
-    r: BigInt(signature.r),
-    s: BigInt(signature.s),
-    recovery: signature.recovery,
+  const parsedSignature = JSON.parse(signature);
+
+  const restoredSignature = {
+    r: BigInt(parsedSignature.r),
+    s: BigInt(parsedSignature.s),
+    recovery: parsedSignature.recovery,
   };
 
-  const isValid = secp256k1.verify(modifiedSignature, messageHash, sender);
-  console.log(isValid);
+  const isValid = secp256k1.verify(restoredSignature, messageHash, sender);
+  if (isValid) {
+    setInitialBalance(sender);
+    setInitialBalance(recipient);
 
-  setInitialBalance(sender);
-  setInitialBalance(recipient);
-
-  if (balances[sender] < amount) {
-    res.status(400).send({ message: "Not enough funds!" });
+    if (balances[sender] < amount) {
+      res.status(400).send({ message: "Not enough funds!" });
+    } else {
+      balances[sender] -= amount;
+      balances[recipient] += amount;
+      res.send({ balance: balances[sender] });
+    }
   } else {
-    balances[sender] -= amount;
-    balances[recipient] += amount;
-    res.send({ balance: balances[sender] });
+    res.status(400).send({ message: "Wrong signature" });
   }
 });
 
